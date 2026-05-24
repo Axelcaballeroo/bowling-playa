@@ -1,8 +1,17 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+
 export default function WhatsappFloatingButton() {
+  const pathname = usePathname();
   const phone = "529841234567";
   const text = encodeURIComponent(
     "Hola, quiero información sobre Bowling Playa."
   );
+
+  if (pathname === "/menu") {
+    return null;
+  }
 
   return (
     <a
