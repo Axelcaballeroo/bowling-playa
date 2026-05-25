@@ -48,11 +48,11 @@ function description(
 function PriceLine({ label, price }: { label: string; price: string }) {
   return (
     <div className="flex items-baseline gap-2 text-[14px] leading-6 sm:text-[15px]">
-      <span className="max-w-[70%] shrink-0 font-medium text-zinc-200">
+      <span className="min-w-0 max-w-[68%] shrink-0 break-words font-medium text-zinc-200">
         {label}
       </span>
-      <span className="min-w-6 flex-1 translate-y-[-3px] border-b border-dotted border-zinc-600/80" />
-      <span className="shrink-0 font-black tabular-nums text-[#f4d48a]">
+      <span className="min-w-6 flex-1 translate-y-[-3px] border-b border-dotted border-zinc-600/70" />
+      <span className="shrink-0 font-black tabular-nums text-[#efd184] drop-shadow-[0_1px_10px_rgba(239,209,132,0.12)]">
         {price}
       </span>
     </div>
@@ -70,26 +70,26 @@ function ProductItem({
 
   if (product.variants?.length) {
     return (
-      <article className="border-b border-white/[0.07] py-[18px] last:border-b-0">
+      <article className="border-b border-white/[0.06] py-4 last:border-b-0 sm:py-[18px]">
         <div className="mb-2 flex items-start justify-between gap-3">
-          <h3 className="min-w-0 text-[15px] font-black uppercase leading-5 tracking-[0.02em] text-white sm:text-[16px]">
+          <h3 className="min-w-0 break-words text-[15px] font-black uppercase leading-5 tracking-[0.02em] text-zinc-50 sm:text-[16px]">
             {localized(product, language)}
           </h3>
 
           {product.badge && (
-            <span className="shrink-0 rounded-full border border-[#f4d48a]/25 bg-[#f4d48a]/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-[#f4d48a]">
+            <span className="shrink-0 rounded-full border border-[#efd184]/25 bg-[#efd184]/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-[#efd184] shadow-[0_4px_18px_rgba(239,209,132,0.08)]">
               {product.badge}
             </span>
           )}
         </div>
 
         {productDescription && (
-          <p className="mb-2.5 max-w-[34rem] text-[13px] leading-5 text-zinc-500">
+          <p className="mb-3 max-w-[34rem] text-[13px] leading-5 text-zinc-500">
             {productDescription}
           </p>
         )}
 
-        <div className="space-y-1 rounded-2xl bg-white/[0.025] px-3 py-2 ring-1 ring-white/[0.05]">
+        <div className="space-y-1.5 rounded-[18px] bg-white/[0.025] px-3 py-2.5 ring-1 ring-white/[0.045]">
           {product.variants.map((variant) => (
             <PriceLine
               key={`${product.id}-${variant.label_es}-${variant.price}`}
@@ -103,25 +103,25 @@ function ProductItem({
   }
 
   return (
-    <article className="border-b border-white/[0.07] py-[18px] last:border-b-0">
+    <article className="border-b border-white/[0.06] py-4 last:border-b-0 sm:py-[18px]">
       <div className="flex items-baseline gap-2">
-        <h3 className="max-w-[70%] shrink-0 text-[15px] font-black uppercase leading-5 tracking-[0.02em] text-white sm:text-[16px]">
+        <h3 className="min-w-0 max-w-[68%] shrink-0 break-words text-[15px] font-black uppercase leading-5 tracking-[0.02em] text-zinc-50 sm:text-[16px]">
           {localized(product, language)}
         </h3>
-        <span className="min-w-6 flex-1 translate-y-[-3px] border-b border-dotted border-zinc-600/80" />
-        <span className="shrink-0 text-[15px] font-black tabular-nums text-[#f4d48a]">
+        <span className="min-w-6 flex-1 translate-y-[-3px] border-b border-dotted border-zinc-600/70" />
+        <span className="shrink-0 text-[15px] font-black tabular-nums text-[#efd184] drop-shadow-[0_1px_10px_rgba(239,209,132,0.12)]">
           {product.price || ""}
         </span>
       </div>
 
       {productDescription && (
-        <p className="mt-1.5 max-w-[34rem] pr-12 text-[13px] leading-5 text-zinc-500">
+        <p className="mt-1.5 max-w-[34rem] pr-6 text-[13px] leading-5 text-zinc-500 sm:pr-12">
           {productDescription}
         </p>
       )}
 
       {product.badge && (
-        <span className="mt-2 inline-flex rounded-full border border-[#f4d48a]/25 bg-[#f4d48a]/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-[#f4d48a]">
+        <span className="mt-2 inline-flex rounded-full border border-[#efd184]/25 bg-[#efd184]/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] text-[#efd184]">
           {product.badge}
         </span>
       )}
@@ -137,24 +137,24 @@ function SubcategoryBanner({
   language: MenuLanguage;
 }) {
   return (
-    <section className="overflow-hidden rounded-[22px] bg-[#141216] shadow-[0_18px_60px_rgba(0,0,0,0.28)] ring-1 ring-white/10">
+    <section className="overflow-hidden rounded-[20px] border border-white/[0.08] bg-[#121115] shadow-[0_16px_45px_rgba(0,0,0,0.24)]">
       <div
-        className="h-24 bg-cover bg-center sm:h-28"
+        className="h-[86px] bg-cover bg-center sm:h-28"
         style={{
-          backgroundImage: `linear-gradient(90deg, rgba(8,7,10,0.92), rgba(8,7,10,0.58) 52%, rgba(8,7,10,0.22)), url('${subcategory.bannerImage}')`,
+          backgroundImage: `linear-gradient(90deg, rgba(7,6,9,0.95), rgba(7,6,9,0.66) 54%, rgba(7,6,9,0.22)), url('${subcategory.bannerImage}')`,
         }}
       >
-        <div className="flex h-full flex-col justify-end px-5 py-4">
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#f4d48a]">
+        <div className="flex h-full flex-col justify-end px-4 py-3.5 sm:px-5 sm:py-4">
+          <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#efd184]">
             Bowling Playa
           </p>
-          <h2 className="mt-1 text-[24px] font-black leading-7 text-white">
+          <h2 className="mt-1 text-[23px] font-black leading-7 text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.45)]">
             {localized(subcategory, language)}
           </h2>
         </div>
       </div>
 
-      <p className="px-5 py-3 text-[13px] leading-5 text-zinc-400">
+      <p className="border-t border-white/[0.06] px-4 py-2.5 text-[13px] leading-5 text-zinc-400 sm:px-5">
         {description(subcategory, language)}
       </p>
     </section>
@@ -225,35 +225,35 @@ export default function MenuPage() {
       : "No products found with that name";
 
   return (
-    <main className="min-h-screen w-screen max-w-[100vw] overflow-x-hidden bg-[#08070a] text-white [&_*]:box-border">
-      <header className="relative bg-[#08070a]">
-        <div className="h-20 bg-[linear-gradient(180deg,rgba(0,0,0,0.08),rgba(8,7,10,0.96)),url('/bowling-hero.jpeg')] bg-cover bg-center sm:h-24" />
+    <main className="min-h-screen w-screen max-w-[100vw] overflow-x-hidden bg-[#070609] text-white [background-image:linear-gradient(180deg,#0b080b_0%,#070609_38%,#050506_100%)] [&_*]:box-border">
+      <header className="relative bg-[#070609]">
+        <div className="h-[68px] bg-[linear-gradient(180deg,rgba(0,0,0,0.05),rgba(7,6,9,0.96)),url('/bowling-hero.jpeg')] bg-cover bg-center sm:h-24" />
 
-        <section className="-mt-7 px-3 pb-3 sm:px-4">
+        <section className="-mt-6 px-3 pb-2.5 sm:px-4">
           <div className="mx-auto max-w-[720px]">
-            <div className="min-w-0 rounded-[24px] border border-white/10 bg-[#111015]/95 px-3 pb-3 pt-3 shadow-[0_22px_70px_rgba(0,0,0,0.42)] backdrop-blur sm:px-4 sm:pb-4">
+            <div className="min-w-0 rounded-[22px] border border-white/[0.09] bg-[#111015]/96 px-3 pb-3 pt-3 shadow-[0_18px_55px_rgba(0,0,0,0.38)] backdrop-blur-md sm:px-4 sm:pb-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-[#f4d48a]/25 bg-[#1b1712] text-sm font-black text-[#f4d48a] shadow-lg sm:h-14 sm:w-14 sm:text-base">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[15px] border border-[#efd184]/25 bg-[#1a1511] text-sm font-black text-[#efd184] shadow-[0_10px_30px_rgba(0,0,0,0.28)] sm:h-14 sm:w-14 sm:rounded-2xl sm:text-base">
                     BP
                   </div>
 
                   <div className="min-w-0">
-                    <h1 className="truncate text-[19px] font-black leading-6 tracking-[0.01em] sm:text-[21px]">
+                    <h1 className="truncate text-[18px] font-black leading-5 tracking-[0.01em] sm:text-[21px] sm:leading-6">
                       Bowling Playa
                     </h1>
-                    <p className="mt-0.5 text-[11px] font-bold tracking-[0.06em] text-[#f4d48a] sm:text-[12px] sm:tracking-[0.08em]">
+                    <p className="mt-0.5 text-[11px] font-bold tracking-[0.06em] text-[#efd184] sm:text-[12px] sm:tracking-[0.08em]">
                       {language === "es" ? "Menú digital" : "Digital menu"}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex shrink-0 rounded-full border border-white/10 bg-black/25 p-0.5">
+                <div className="flex shrink-0 rounded-full border border-white/[0.08] bg-black/30 p-0.5 shadow-inner shadow-black/30">
                   {(["es", "en"] as MenuLanguage[]).map((item) => (
                     <button
-                      className={`h-7 rounded-full px-2 text-[10px] font-black tracking-[0.06em] transition sm:h-8 sm:px-2.5 sm:text-[11px] sm:tracking-[0.08em] ${
+                      className={`h-7 rounded-full px-2.5 text-[10px] font-black tracking-[0.06em] transition duration-200 active:scale-95 sm:h-8 sm:px-3 sm:text-[11px] sm:tracking-[0.08em] ${
                         language === item
-                          ? "bg-[#f4d48a] text-[#17110a] shadow-[0_6px_18px_rgba(244,212,138,0.18)]"
+                          ? "bg-[#efd184] text-[#17110a] shadow-[0_8px_22px_rgba(239,209,132,0.18)]"
                           : "text-zinc-400 hover:text-white"
                       }`}
                       key={item}
@@ -266,15 +266,15 @@ export default function MenuPage() {
                 </div>
               </div>
 
-              <div className="mt-4 grid min-w-0 grid-cols-2 gap-1.5 rounded-[18px] border border-white/10 bg-black/25 p-1.5">
+              <div className="mt-3 grid min-w-0 grid-cols-2 gap-1 rounded-[17px] border border-white/[0.08] bg-black/30 p-1.5 shadow-inner shadow-black/30">
                 {menuSections.map((section) => {
                   const isActive = activeSection === section.id;
 
                   return (
                     <button
-                      className={`min-w-0 rounded-[14px] py-3 text-[12px] font-black uppercase tracking-[0.1em] transition sm:text-[13px] sm:tracking-[0.14em] ${
+                      className={`min-w-0 rounded-[13px] py-2.5 text-[12px] font-black uppercase tracking-[0.11em] transition duration-200 active:scale-[0.98] sm:py-3 sm:text-[13px] sm:tracking-[0.14em] ${
                         isActive
-                          ? "bg-[#f4d48a] text-[#17110a] shadow-[0_10px_28px_rgba(244,212,138,0.16)]"
+                          ? "bg-[#efd184] text-[#17110a] shadow-[0_10px_28px_rgba(239,209,132,0.14)]"
                           : "text-zinc-400 hover:bg-white/[0.04] hover:text-white"
                       }`}
                       key={section.id}
@@ -287,7 +287,7 @@ export default function MenuPage() {
                 })}
               </div>
 
-              <label className="relative mt-3 block">
+              <label className="relative mt-2.5 block">
                 <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
                   <SearchIcon />
                 </span>
@@ -299,7 +299,7 @@ export default function MenuPage() {
                       ? "Buscar en esta seccion"
                       : "Search this section"
                   }
-                  className="h-11 w-full rounded-[16px] border border-white/10 bg-[#09080b] pl-11 pr-4 text-[14px] font-semibold text-white outline-none placeholder:text-zinc-600 focus:border-[#f4d48a]/60 focus:bg-[#0c0b0f]"
+                  className="h-10 w-full rounded-[15px] border border-white/[0.08] bg-[#09080b] pl-11 pr-4 text-[14px] font-semibold text-white outline-none transition duration-200 placeholder:text-zinc-600 focus:border-[#efd184]/55 focus:bg-[#0c0b0f] sm:h-11"
                   type="search"
                 />
               </label>
@@ -308,33 +308,37 @@ export default function MenuPage() {
         </section>
       </header>
 
-      <nav className="sticky top-0 z-30 border-y border-white/10 bg-[#08070a]/92 shadow-[0_14px_34px_rgba(0,0,0,0.32)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[720px] gap-2 overflow-x-auto px-3 py-2.5 [scrollbar-width:none] sm:px-4 [&::-webkit-scrollbar]:hidden">
-          {sectionSubcategories.map((subcategory) => {
-            const isActive = selectedSubcategory?.id === subcategory.id;
+      <nav className="sticky top-0 z-30 border-y border-white/[0.07] bg-[#070609]/92 shadow-[0_12px_30px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+        <div className="relative mx-auto max-w-[720px]">
+          <div className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 w-4 bg-gradient-to-r from-[#070609] to-transparent" />
+          <div className="pointer-events-none absolute bottom-0 right-0 top-0 z-10 w-8 bg-gradient-to-l from-[#070609] to-transparent" />
+          <div className="flex gap-2 overflow-x-auto px-3 py-2 [scrollbar-width:none] sm:px-4 [&::-webkit-scrollbar]:hidden">
+            {sectionSubcategories.map((subcategory) => {
+              const isActive = selectedSubcategory?.id === subcategory.id;
 
-            return (
-              <button
-                className={`shrink-0 rounded-full px-3.5 py-2 text-[12px] font-black transition ${
-                  isActive
-                    ? "bg-white text-[#17110a] shadow-[0_8px_24px_rgba(255,255,255,0.12)]"
-                    : "bg-[#141216] text-zinc-400 ring-1 ring-white/10 hover:text-white"
-                }`}
-                key={subcategory.id}
-                onClick={() => {
-                  setActiveSubcategory(subcategory.id);
-                  setSearch("");
-                }}
-                type="button"
-              >
-                {localized(subcategory, language)}
-              </button>
-            );
-          })}
+              return (
+                <button
+                  className={`shrink-0 rounded-full px-3.5 py-2 text-[12px] font-black transition duration-200 active:scale-95 ${
+                    isActive
+                      ? "bg-white text-[#17110a] shadow-[0_8px_22px_rgba(255,255,255,0.12)]"
+                      : "bg-[#121115] text-zinc-400 ring-1 ring-white/[0.08] hover:bg-white/[0.05] hover:text-white"
+                  }`}
+                  key={subcategory.id}
+                  onClick={() => {
+                    setActiveSubcategory(subcategory.id);
+                    setSearch("");
+                  }}
+                  type="button"
+                >
+                  {localized(subcategory, language)}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </nav>
 
-      <section className="relative mx-auto max-w-[720px] px-3 pb-12 pt-4 sm:px-4">
+      <section className="relative mx-auto max-w-[720px] px-3.5 pb-12 pt-3.5 sm:px-4 sm:pt-4">
         {selectedSubcategory && (
           <SubcategoryBanner
             language={language}
@@ -342,7 +346,7 @@ export default function MenuPage() {
           />
         )}
 
-        <div className="mt-4 overflow-hidden rounded-[22px] border border-white/10 bg-[#111015] px-4 shadow-[0_20px_70px_rgba(0,0,0,0.26)] sm:px-5">
+        <div className="mt-3.5 overflow-hidden rounded-[20px] border border-white/[0.08] bg-[#101014] px-3.5 shadow-[0_18px_58px_rgba(0,0,0,0.24)] sm:mt-4 sm:px-5">
           {visibleProducts.length > 0 ? (
             visibleProducts.map((product) => (
               <ProductItem
