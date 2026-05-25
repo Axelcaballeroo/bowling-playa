@@ -29,7 +29,7 @@ function isValidSchedule(
 ) {
   const opening = getOpeningHour(date);
 
-  let openMinutes = timeToMinutes(opening);
+  const openMinutes = timeToMinutes(opening);
   let closeMinutes = timeToMinutes("01:00");
 
   if (closeMinutes <= openMinutes) {

@@ -267,7 +267,9 @@ export default function ReservasPage() {
 
   useEffect(() => {
     if (!date) {
-      setReservations([]);
+      queueMicrotask(() => {
+        setReservations([]);
+      });
       return;
     }
 
