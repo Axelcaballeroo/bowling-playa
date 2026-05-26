@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../src/lib/supabaseClient";
@@ -19,6 +20,21 @@ type Reservation = {
   created_at: string;
 };
 
+type Block = {
+  id: string;
+  date: string;
+  lane: number;
+  start_time: string;
+  end_time: string;
+  reason: string;
+  created_at: string;
+};
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0 },
+};
+
 function timeToMinutes(time: string) {
   const cleanTime = time.slice(0, 5);
   const [hours, minutes] = cleanTime.split(":").map(Number);
@@ -29,7 +45,6 @@ function minutesToTime(totalMinutes: number) {
   totalMinutes = totalMinutes % 1440;
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
@@ -41,8 +56,7 @@ function getDayOfWeekFromDate(date: string) {
 
 function getOpeningHour(date: string) {
   const day = getDayOfWeekFromDate(date);
-  if (day === 0 || day === 5 || day === 6) return "15:00";
-  return "17:00";
+  return day === 0 || day === 5 || day === 6 ? "15:00" : "17:00";
 }
 
 function generateTimeSlots(date: string) {
@@ -74,7 +88,6 @@ function reservationOverlapsSlot(
 
   const slotStart = timeToMinutes(slotTime);
   const slotEnd = slotStart + 30;
-
   const reservationStart = timeToMinutes(reservation.start_time);
   const reservationEnd = timeToMinutes(reservation.end_time);
 
@@ -91,6 +104,19 @@ function getReservationForSlot(
   );
 }
 
+function getBlockForSlot(blocks: Block[], lane: number, slotTime: string) {
+  return blocks.find((block) => {
+    if (block.lane !== lane) return false;
+
+    const slotStart = timeToMinutes(slotTime);
+    const slotEnd = slotStart + 30;
+    const blockStart = timeToMinutes(block.start_time);
+    const blockEnd = timeToMinutes(block.end_time);
+
+    return slotStart < blockEnd && slotEnd > blockStart;
+  });
+}
+
 function getStatusLabel(status: Reservation["status"]) {
   if (status === "confirmed") return "Confirmada";
   if (status === "cancelled") return "Cancelada";
@@ -99,24 +125,47 @@ function getStatusLabel(status: Reservation["status"]) {
 
 function getCardClasses(status: Reservation["status"]) {
   if (status === "confirmed") {
-    return "border-emerald-400/30 bg-emerald-400/10 text-emerald-100";
+    return "border-emerald-400/25 bg-emerald-500/[0.09] text-emerald-100";
   }
 
   if (status === "cancelled") {
-    return "border-red-400/30 bg-red-500/10 text-red-100";
+    return "border-red-400/25 bg-red-500/[0.09] text-red-100";
   }
 
-  return "border-yellow-400/30 bg-yellow-400/10 text-yellow-100";
+  return "border-[#efd184]/30 bg-[#efd184]/[0.1] text-[#f7df9b]";
+}
+
+function getStatusDot(status: Reservation["status"]) {
+  if (status === "confirmed") return "bg-emerald-400";
+  if (status === "cancelled") return "bg-red-400";
+  return "bg-[#efd184]";
 }
 
 function getWhatsappLink(reservation: Reservation) {
   const phone = reservation.phone.replace(/\D/g, "");
 
+  const statusText =
+    reservation.status === "confirmed"
+      ? "confirmada"
+      : reservation.status === "cancelled"
+      ? "cancelada"
+      : "recibida";
+
   const message = encodeURIComponent(
-    `Hola ${reservation.name}, te escribimos de Bowling Playa 🎳\n\nConfirmamos tu reserva:\nFecha: ${reservation.date}\nPista: ${reservation.lane}\nHorario: ${reservation.start_time.slice(
+    `Hola ${reservation.name}, somos Bowling Playa 🎳
+
+Tu reserva fue ${statusText}.
+
+📅 Fecha: ${reservation.date}
+🎳 Pista: ${reservation.lane}
+🕒 Horario: ${reservation.start_time.slice(0, 5)} a ${reservation.end_time.slice(
       0,
       5
-    )} a ${reservation.end_time.slice(0, 5)}\n\n¡Te esperamos!`
+    )}
+
+Ante cualquier cambio, podés respondernos por este medio.
+
+¡Te esperamos!`
   );
 
   return `https://wa.me/${phone}?text=${message}`;
@@ -140,11 +189,26 @@ async function fetchReservations(date: string) {
   return data.reservations as Reservation[];
 }
 
+async function fetchBlocks(date: string) {
+  const response = await fetch(`/api/blocks?date=${date}`, {
+    cache: "no-store",
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.ok) {
+    throw new Error(data.message || "No se pudieron cargar los bloqueos.");
+  }
+
+  return data.blocks as Block[];
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const supabase = createClient();
 
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [blocks, setBlocks] = useState<Block[]>([]);
   const [dateFilter, setDateFilter] = useState(getTodayDate());
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -157,24 +221,29 @@ export default function AdminPage() {
       pending: reservations.filter((r) => r.status === "pending").length,
       confirmed: reservations.filter((r) => r.status === "confirmed").length,
       cancelled: reservations.filter((r) => r.status === "cancelled").length,
+      blocks: blocks.length,
     };
-  }, [reservations]);
+  }, [reservations, blocks]);
 
   useEffect(() => {
-    loadReservations(dateFilter);
+    loadAgenda(dateFilter);
   }, [dateFilter]);
 
-  async function loadReservations(date: string) {
+  async function loadAgenda(date: string) {
     try {
       setIsLoading(true);
       setMessage("");
-      const loadedReservations = await fetchReservations(date);
+
+      const [loadedReservations, loadedBlocks] = await Promise.all([
+        fetchReservations(date),
+        fetchBlocks(date),
+      ]);
+
       setReservations(loadedReservations);
+      setBlocks(loadedBlocks);
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudieron cargar las reservas."
+        error instanceof Error ? error.message : "No se pudo cargar la agenda."
       );
     } finally {
       setIsLoading(false);
@@ -187,9 +256,7 @@ export default function AdminPage() {
 
       const response = await fetch("/api/reservations", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status }),
       });
 
@@ -199,12 +266,77 @@ export default function AdminPage() {
         throw new Error(data.message || "No se pudo actualizar la reserva.");
       }
 
-      await loadReservations(dateFilter);
+      await loadAgenda(dateFilter);
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
           : "No se pudo actualizar la reserva."
+      );
+    }
+  }
+
+  async function createBlock(lane: number) {
+    const start = prompt("Horario inicio del bloqueo. Ejemplo: 20:00");
+    if (!start) return;
+
+    const end = prompt("Horario fin del bloqueo. Ejemplo: 22:00");
+    if (!end) return;
+
+    const reason = prompt("Motivo del bloqueo") || "Bloqueo manual";
+
+    try {
+      setMessage("");
+
+      const response = await fetch("/api/blocks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          date: dateFilter,
+          lane,
+          start_time: start,
+          end_time: end,
+          reason,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.message || "No se pudo crear el bloqueo.");
+      }
+
+      await loadAgenda(dateFilter);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "No se pudo crear el bloqueo."
+      );
+    }
+  }
+
+  async function deleteBlock(id: string) {
+    const confirmed = window.confirm("¿Seguro que querés desbloquear este horario?");
+    if (!confirmed) return;
+
+    try {
+      setMessage("");
+
+      const response = await fetch(`/api/blocks?id=${id}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.message || "No se pudo eliminar el bloqueo.");
+      }
+
+      await loadAgenda(dateFilter);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "No se pudo eliminar el bloqueo."
       );
     }
   }
@@ -228,32 +360,42 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#030b18] px-6 py-16 text-white">
-      <section className="mx-auto max-w-7xl">
-        <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+    <main className="min-h-screen overflow-x-hidden bg-[#070609] bg-[radial-gradient(circle_at_18%_0%,rgba(239,209,132,0.12),transparent_26%),radial-gradient(circle_at_88%_14%,rgba(14,165,233,0.14),transparent_28%)] px-4 py-6 text-white sm:px-6 sm:py-10">
+      <motion.section
+        initial="hidden"
+        animate="show"
+        transition={{ staggerChildren: 0.08 }}
+        className="mx-auto max-w-7xl"
+      >
+        <motion.div
+          variants={fadeUp}
+          transition={{ duration: 0.55 }}
+          className="mb-6 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"
+        >
           <div>
-            <span className="rounded-full bg-blue-500/10 px-4 py-2 text-sm font-bold text-blue-300">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#efd184]/20 bg-[#efd184]/10 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-[#efd184]">
+              <span className="h-2 w-2 rounded-full bg-[#efd184]" />
               Panel privado
             </span>
 
-            <h1 className="mt-5 text-5xl font-black tracking-tight">
+            <h1 className="mt-5 text-4xl font-black tracking-tight md:text-5xl">
               Agenda diaria
             </h1>
 
-            <p className="mt-4 max-w-2xl text-lg text-slate-400">
-              Vista por fecha, horario y pista para gestionar reservas.
+            <p className="mt-3 max-w-2xl text-base leading-7 text-zinc-400 md:text-lg">
+              Gestioná reservas, bloqueos manuales y disponibilidad por pista.
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-            <label className="block text-sm font-bold text-slate-300">
-              Fecha
+          <div className="rounded-[28px] border border-white/[0.08] bg-[#111015]/92 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur">
+            <label className="mb-3 block text-sm font-bold text-slate-300">
+              Fecha de agenda
             </label>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               <button
                 onClick={() => goToRelativeDay(-1)}
-                className="rounded-xl bg-white/10 px-3 py-3 text-sm font-bold text-slate-300 hover:bg-white/15"
+                className="rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 text-sm font-black text-zinc-300 transition hover:bg-white/[0.09] active:scale-95"
               >
                 ←
               </button>
@@ -262,103 +404,141 @@ export default function AdminPage() {
                 type="date"
                 value={dateFilter}
                 onChange={(event) => setDateFilter(event.target.value)}
-                className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-blue-500"
+                className="col-span-2 rounded-xl border border-white/[0.08] bg-[#07070b]/90 px-4 py-3 text-white outline-none transition [color-scheme:dark] focus:border-[#efd184]/70 focus:ring-4 focus:ring-[#efd184]/10 [&::-webkit-calendar-picker-indicator]:invert sm:col-span-1"
               />
 
               <button
                 onClick={() => goToRelativeDay(1)}
-                className="rounded-xl bg-white/10 px-3 py-3 text-sm font-bold text-slate-300 hover:bg-white/15"
+                className="rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 text-sm font-black text-zinc-300 transition hover:bg-white/[0.09] active:scale-95"
               >
                 →
               </button>
 
               <button
                 onClick={() => setDateFilter(getTodayDate())}
-                className="rounded-xl bg-blue-600/80 px-4 py-3 text-sm font-bold text-white hover:bg-blue-500"
+                className="rounded-xl bg-[#efd184] px-4 py-3 text-sm font-black text-[#17110a] transition hover:bg-[#f5dd9a] active:scale-95"
               >
                 Hoy
               </button>
 
               <button
-                onClick={() => loadReservations(dateFilter)}
-                className="rounded-xl bg-emerald-500/15 px-4 py-3 text-sm font-bold text-emerald-200 hover:bg-emerald-500/25"
+                onClick={() => loadAgenda(dateFilter)}
+                className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm font-black text-emerald-200 transition hover:bg-emerald-500/20 active:scale-95"
               >
                 Actualizar
               </button>
 
               <button
                 onClick={logout}
-                className="rounded-xl bg-red-500/15 px-4 py-3 text-sm font-bold text-red-200 hover:bg-red-500/25"
+                className="rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm font-black text-red-200 transition hover:bg-red-500/20 active:scale-95"
               >
                 Salir
               </button>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {message && (
-          <div className="mb-6 rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-sm font-semibold text-slate-300">
+          <motion.div
+            variants={fadeUp}
+            className="mb-6 rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-sm font-semibold text-slate-300"
+          >
             {message}
-          </div>
+          </motion.div>
         )}
 
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.05] p-5">
+        <motion.div
+          variants={fadeUp}
+          transition={{ duration: 0.55 }}
+          className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"
+        >
+          <div className="rounded-[24px] border border-white/[0.08] bg-[#111015]/86 p-5 shadow-[0_18px_55px_rgba(0,0,0,0.24)] backdrop-blur">
             <p className="text-sm font-bold text-slate-400">Total del día</p>
             <p className="mt-2 text-3xl font-black">{stats.total}</p>
           </div>
 
-          <div className="rounded-3xl border border-yellow-400/20 bg-yellow-400/10 p-5">
-            <p className="text-sm font-bold text-yellow-200">Pendientes</p>
+          <div className="rounded-[24px] border border-[#efd184]/20 bg-[#efd184]/10 p-5 shadow-[0_18px_55px_rgba(0,0,0,0.24)] backdrop-blur">
+            <p className="text-sm font-bold text-[#f7df9b]">Pendientes</p>
             <p className="mt-2 text-3xl font-black">{stats.pending}</p>
           </div>
 
-          <div className="rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-5">
+          <div className="rounded-[24px] border border-emerald-400/20 bg-emerald-500/10 p-5 shadow-[0_18px_55px_rgba(0,0,0,0.24)] backdrop-blur">
             <p className="text-sm font-bold text-emerald-200">Confirmadas</p>
             <p className="mt-2 text-3xl font-black">{stats.confirmed}</p>
           </div>
 
-          <div className="rounded-3xl border border-red-400/20 bg-red-500/10 p-5">
+          <div className="rounded-[24px] border border-red-400/20 bg-red-500/10 p-5 shadow-[0_18px_55px_rgba(0,0,0,0.24)] backdrop-blur">
             <p className="text-sm font-bold text-red-200">Canceladas</p>
             <p className="mt-2 text-3xl font-black">{stats.cancelled}</p>
           </div>
-        </div>
 
-        <section className="rounded-[28px] border border-white/10 bg-white/[0.05] p-6 shadow-2xl">
-          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="rounded-[24px] border border-fuchsia-400/20 bg-fuchsia-500/10 p-5 shadow-[0_18px_55px_rgba(0,0,0,0.24)] backdrop-blur">
+            <p className="text-sm font-bold text-fuchsia-200">Bloqueos</p>
+            <p className="mt-2 text-3xl font-black">{stats.blocks}</p>
+          </div>
+        </motion.div>
+
+        <motion.section
+          variants={fadeUp}
+          transition={{ duration: 0.55 }}
+          className="rounded-[28px] border border-white/[0.08] bg-[#111015]/92 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur sm:p-6"
+        >
+          <div className="mb-7 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
-              <h2 className="text-2xl font-black">Calendario de pistas</h2>
-              <p className="mt-1 text-sm text-slate-400">
+              <h2 className="text-2xl font-black tracking-tight">
+                Calendario de pistas
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-400">
                 {isLoading
                   ? "Cargando agenda..."
                   : `Horarios del día: ${getOpeningHour(dateFilter)} a 01:00`}
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3 text-xs font-bold">
-              <span className="rounded-full border border-yellow-400/30 bg-yellow-400/10 px-3 py-2 text-yellow-200">
+            <div className="flex flex-wrap gap-2 text-[11px] font-black sm:text-xs">
+              <span className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-[#f7df9b]">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#efd184]" />
                 Pendiente
               </span>
-              <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-emerald-200">
+              <span className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-emerald-200">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
                 Confirmada
               </span>
-              <span className="rounded-full border border-white/10 bg-slate-950 px-3 py-2 text-slate-400">
+              <span className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-fuchsia-200">
+                <span className="h-2.5 w-2.5 rounded-full bg-fuchsia-400" />
+                Bloqueada
+              </span>
+              <span className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-zinc-500">
+                <span className="h-2.5 w-2.5 rounded-full bg-slate-600" />
                 Libre
               </span>
             </div>
           </div>
 
-          <div className="overflow-x-auto pb-2">
-            <div className="min-w-[1180px]">
-              <div className="grid grid-cols-7 gap-3">
-                <div className="rounded-2xl bg-slate-950 p-4 font-bold">
+          <div className="-mx-1 mb-6 flex gap-2 overflow-x-auto px-1 pb-1">
+            {lanes.map((lane) => (
+              <button
+                key={lane}
+                onClick={() => createBlock(lane)}
+                className="shrink-0 rounded-full border border-fuchsia-400/20 bg-fuchsia-500/10 px-4 py-2.5 text-xs font-black text-fuchsia-200 transition hover:bg-fuchsia-500/20 active:scale-95"
+              >
+                Bloquear pista {lane}
+              </button>
+            ))}
+          </div>
+
+          <div className="-mx-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
+            <div className="min-w-[1120px]">
+              <div className="grid grid-cols-7 gap-2 sm:gap-3">
+                <div className="sticky left-0 z-10 rounded-2xl border border-white/[0.06] bg-[#07070b] p-3 text-center text-xs font-black uppercase tracking-[0.12em] text-zinc-400 shadow-[12px_0_24px_rgba(0,0,0,0.24)]">
                   Horario
                 </div>
 
                 {lanes.map((lane) => (
                   <div
                     key={lane}
-                    className="rounded-2xl bg-slate-950 p-4 text-center font-bold"
+                    className="rounded-2xl border border-white/[0.06] bg-[#07070b] p-3 text-center text-xs font-black uppercase tracking-[0.12em] text-zinc-300"
                   >
                     Pista {lane}
                   </div>
@@ -366,7 +546,7 @@ export default function AdminPage() {
 
                 {timeSlots.map((time) => (
                   <div key={time} className="contents">
-                    <div className="rounded-2xl bg-slate-950/70 p-4 font-bold">
+                    <div className="sticky left-0 z-10 rounded-2xl border border-white/[0.06] bg-[#0d0d12] p-3 text-center text-sm font-black text-zinc-300 shadow-[12px_0_24px_rgba(0,0,0,0.24)]">
                       {time}
                     </div>
 
@@ -377,29 +557,70 @@ export default function AdminPage() {
                         time
                       );
 
-                      if (!reservation) {
+                      const block = getBlockForSlot(blocks, lane, time);
+
+                      if (!reservation && !block) {
                         return (
                           <div
                             key={`${time}-${lane}`}
-                            className="rounded-xl border border-white/10 bg-white/[0.025] p-3 text-center text-xs font-bold text-slate-600"
+                            className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-center text-xs font-black text-zinc-700"
                           >
                             Libre
                           </div>
                         );
                       }
 
+                      if (block) {
+                        return (
+                          <motion.div
+                            whileHover={{ y: -3 }}
+                            key={`${time}-${lane}`}
+                            className="rounded-xl border border-fuchsia-400/25 bg-fuchsia-500/[0.09] p-3 text-xs text-fuchsia-100"
+                          >
+                            <div className="flex items-center gap-2 font-black">
+                              <span className="h-2 w-2 rounded-full bg-fuchsia-400" />
+                              Bloqueado
+                            </div>
+
+                            <div className="mt-2 text-[11px] opacity-80">
+                              {block.start_time.slice(0, 5)} -{" "}
+                              {block.end_time.slice(0, 5)}
+                            </div>
+
+                            <div className="mt-2 text-[10px] text-fuchsia-200">
+                              {block.reason}
+                            </div>
+
+                            <button
+                              onClick={() => deleteBlock(block.id)}
+                              className="mt-3 rounded-lg border border-red-400/15 bg-red-500/15 px-2 py-1 text-[10px] font-black text-red-100 transition hover:bg-red-500/25 active:scale-95"
+                            >
+                              Desbloquear
+                            </button>
+                          </motion.div>
+                        );
+                      }
+
+                      if (!reservation) return null;
+
                       return (
-                        <div
+                        <motion.div
+                          whileHover={{ y: -3 }}
                           key={`${time}-${lane}`}
-                          className={`rounded-xl border p-3 text-xs ${getCardClasses(
+                          className={`rounded-xl border p-3 text-xs shadow-[0_10px_24px_rgba(0,0,0,0.16)] ${getCardClasses(
                             reservation.status
                           )}`}
                         >
-                          <div className="font-black">
+                          <div className="flex items-center gap-2 font-black">
+                            <span
+                              className={`h-2 w-2 rounded-full ${getStatusDot(
+                                reservation.status
+                              )}`}
+                            />
                             {getStatusLabel(reservation.status)}
                           </div>
 
-                          <div className="mt-1 font-bold text-white">
+                          <div className="mt-2 font-bold text-white">
                             {reservation.name}
                           </div>
 
@@ -413,7 +634,7 @@ export default function AdminPage() {
                               onClick={() =>
                                 updateStatus(reservation.id, "confirmed")
                               }
-                              className="rounded-lg bg-emerald-500/20 px-2 py-1 text-[10px] font-bold text-emerald-100 hover:bg-emerald-500/30"
+                              className="rounded-lg border border-emerald-400/15 bg-emerald-500/15 px-2 py-1 text-[10px] font-black text-emerald-100 transition hover:bg-emerald-500/25 active:scale-95"
                             >
                               OK
                             </button>
@@ -422,7 +643,7 @@ export default function AdminPage() {
                               onClick={() =>
                                 updateStatus(reservation.id, "cancelled")
                               }
-                              className="rounded-lg bg-red-500/20 px-2 py-1 text-[10px] font-bold text-red-100 hover:bg-red-500/30"
+                              className="rounded-lg border border-red-400/15 bg-red-500/15 px-2 py-1 text-[10px] font-black text-red-100 transition hover:bg-red-500/25 active:scale-95"
                             >
                               Cancelar
                             </button>
@@ -431,12 +652,12 @@ export default function AdminPage() {
                               href={getWhatsappLink(reservation)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="rounded-lg bg-blue-500/20 px-2 py-1 text-[10px] font-bold text-blue-100 hover:bg-blue-500/30"
+                              className="rounded-lg border border-sky-400/15 bg-sky-500/15 px-2 py-1 text-[10px] font-black text-sky-100 transition hover:bg-sky-500/25 active:scale-95"
                             >
-                              WhatsApp
+                              Enviar WA
                             </a>
                           </div>
-                        </div>
+                        </motion.div>
                       );
                     })}
                   </div>
@@ -444,8 +665,8 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
-        </section>
-      </section>
+        </motion.section>
+      </motion.section>
     </main>
   );
 }
