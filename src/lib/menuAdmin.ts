@@ -8,6 +8,28 @@ export type MenuAdminUser = {
   id: string;
 };
 
+export type MenuAdminAccess =
+  | {
+      error: null;
+      status: "authorized";
+      user: MenuAdminUser;
+    }
+  | {
+      error: null;
+      status: "unauthenticated";
+      user: null;
+    }
+  | {
+      error: string | null;
+      status: "unauthorized";
+      user: MenuAdminUser;
+    }
+  | {
+      error: string;
+      status: "error";
+      user: MenuAdminUser | null;
+    };
+
 async function getServerSupabaseClient() {
   const cookieStore = await cookies();
 
@@ -34,67 +56,140 @@ async function getServerSupabaseClient() {
 }
 
 export async function getMenuAdminUser(): Promise<MenuAdminUser | null> {
+  const access = await getMenuAdminAccess();
+  return access.status === "authorized" ? access.user : null;
+}
+
+export async function getMenuAdminAccess(): Promise<MenuAdminAccess> {
   const supabase = await getServerSupabaseClient();
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
 
-  if (!user) return null;
+  if (authError) {
+    return {
+      error: authError.message,
+      status: "error",
+      user: null,
+    };
+  }
 
-  const { data: adminByUserId } = await supabaseAdmin
+  if (!user) {
+    return {
+      error: null,
+      status: "unauthenticated",
+      user: null,
+    };
+  }
+
+  const menuUser = {
+    email: user.email || null,
+    id: user.id,
+  };
+
+  const { data: adminByUserId, error: adminByUserIdError } = await supabaseAdmin
     .from("admin_users")
     .select("id, user_id, email, active")
     .eq("user_id", user.id)
     .eq("active", true)
     .maybeSingle();
 
-  if (adminByUserId) {
+  if (adminByUserIdError) {
     return {
-      email: user.email || adminByUserId.email || null,
-      id: user.id,
+      error: adminByUserIdError.message,
+      status: "error",
+      user: menuUser,
     };
   }
 
-  if (!user.email) return null;
+  if (adminByUserId) {
+    return {
+      error: null,
+      status: "authorized",
+      user: {
+        email: user.email || adminByUserId.email || null,
+        id: user.id,
+      },
+    };
+  }
 
-  const { data: adminByEmail } = await supabaseAdmin
+  if (!user.email) {
+    return {
+      error: "La sesion no tiene email asociado.",
+      status: "unauthorized",
+      user: menuUser,
+    };
+  }
+
+  const { data: adminByEmail, error: adminByEmailError } = await supabaseAdmin
     .from("admin_users")
     .select("id, user_id, email, active")
     .eq("email", user.email)
     .eq("active", true)
     .maybeSingle();
 
-  if (!adminByEmail) return null;
+  if (adminByEmailError) {
+    return {
+      error: adminByEmailError.message,
+      status: "error",
+      user: menuUser,
+    };
+  }
+
+  if (!adminByEmail) {
+    return {
+      error: null,
+      status: "unauthorized",
+      user: menuUser,
+    };
+  }
 
   if (!adminByEmail.user_id) {
-    await supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from("admin_users")
       .update({ user_id: user.id })
       .eq("id", adminByEmail.id);
+
+    if (updateError) {
+      return {
+        error: updateError.message,
+        status: "error",
+        user: menuUser,
+      };
+    }
   }
 
   return {
-    email: user.email,
-    id: user.id,
+    error: null,
+    status: "authorized",
+    user: {
+      email: user.email,
+      id: user.id,
+    },
   };
 }
 
 export async function requireMenuAdmin() {
-  const user = await getMenuAdminUser();
+  const access = await getMenuAdminAccess();
 
-  if (!user) {
+  if (access.status === "unauthenticated") {
     redirect("/login");
   }
 
-  return user;
+  if (access.status !== "authorized") {
+    throw new Error(access.error || "No autorizado.");
+  }
+
+  return access.user;
 }
 
 export async function assertMenuAdmin() {
-  const user = await getMenuAdminUser();
+  const access = await getMenuAdminAccess();
 
-  if (!user) {
-    throw new Error("No autorizado.");
+  if (access.status !== "authorized") {
+    throw new Error(access.error || "No autorizado.");
   }
 
-  return user;
+  return access.user;
 }

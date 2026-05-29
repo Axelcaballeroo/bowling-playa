@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import ConfirmSubmitButton from "./ConfirmSubmitButton";
 import {
   createCategory,
@@ -16,7 +17,7 @@ import {
   type AdminMenuSection,
   type AdminMenuVariant,
 } from "./actions";
-import { requireMenuAdmin } from "../../../src/lib/menuAdmin";
+import { getMenuAdminAccess } from "../../../src/lib/menuAdmin";
 
 type PageProps = {
   searchParams: Promise<{
@@ -47,6 +48,44 @@ function inputClass(extra = "") {
 
 function labelClass() {
   return "mb-1.5 block text-[11px] font-black uppercase tracking-[0.12em] text-zinc-500";
+}
+
+function AdminMenuNotice({
+  detail,
+  title,
+}: {
+  detail?: string | null;
+  title: string;
+}) {
+  return (
+    <main className="min-h-screen overflow-x-hidden bg-[#070609] px-4 py-10 text-white sm:px-6">
+      <section className="mx-auto max-w-3xl rounded-[28px] border border-white/[0.08] bg-[#111015]/92 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.35)]">
+        <span className="inline-flex rounded-full border border-[#efd184]/20 bg-[#efd184]/10 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-[#efd184]">
+          Panel privado
+        </span>
+        <h1 className="mt-5 text-3xl font-black tracking-tight">{title}</h1>
+        {detail && (
+          <pre className="mt-5 whitespace-pre-wrap rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm font-semibold leading-6 text-red-100">
+            {detail}
+          </pre>
+        )}
+        <div className="mt-6 flex flex-wrap gap-2">
+          <Link
+            className="rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 text-sm font-black text-zinc-300 transition hover:bg-white/[0.09]"
+            href="/admin"
+          >
+            Ir a reservas
+          </Link>
+          <Link
+            className="rounded-xl border border-[#efd184]/25 bg-[#efd184]/10 px-4 py-3 text-sm font-black text-[#efd184] transition hover:bg-[#efd184]/20"
+            href="/login"
+          >
+            Login
+          </Link>
+        </div>
+      </section>
+    </main>
+  );
 }
 
 function CategoryForm({ category }: { category: AdminMenuCategory }) {
@@ -202,9 +241,46 @@ function VariantForm({ variant }: { variant: AdminMenuVariant }) {
 }
 
 export default async function AdminMenuPage({ searchParams }: PageProps) {
-  await requireMenuAdmin();
+  const access = await getMenuAdminAccess();
+
+  if (access.status === "unauthenticated") {
+    redirect("/login");
+  }
+
+  if (access.status === "unauthorized") {
+    return (
+      <AdminMenuNotice
+        detail={
+          access.error ||
+          `Usuario autenticado sin permiso de menu admin: ${access.user.email || access.user.id}`
+        }
+        title="No autorizado"
+      />
+    );
+  }
+
+  if (access.status === "error") {
+    return (
+      <AdminMenuNotice
+        detail={access.error}
+        title="Error validando permisos de menu admin"
+      />
+    );
+  }
+
   const params = await searchParams;
-  const data = await loadAdminMenuData();
+  let data;
+
+  try {
+    data = await loadAdminMenuData();
+  } catch (error) {
+    return (
+      <AdminMenuNotice
+        detail={error instanceof Error ? error.message : String(error)}
+        title="Error cargando datos del menu"
+      />
+    );
+  }
 
   const sections = data.sections.sort((a, b) => a.sort_order - b.sort_order);
   const activeSection =
